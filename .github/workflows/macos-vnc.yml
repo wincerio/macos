@@ -53,10 +53,19 @@ jobs:
 
       - name: Печать адреса для подключения
         run: |
+          set +e
           echo "Ищу адрес туннеля..."
-          for i in $(seq 1 15); do
-            ADDR=$(curl -s http://127.0.0.1:4040/api/tunnels \
-              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['tunnels'][0]['public_url'])" 2>/dev/null)
+          ADDR=""
+          for i in $(seq 1 20); do
+            ADDR=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null \
+              | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print(d['tunnels'][0]['public_url'])
+except Exception:
+    pass
+" 2>/dev/null)
             if [ -n "$ADDR" ]; then
               CLEAN=${ADDR#tcp://}
               echo "=================================================="
@@ -65,11 +74,13 @@ jobs:
               echo "=================================================="
               break
             fi
+            echo "Попытка $i: туннель ещё не поднялся, жду..."
             sleep 3
           done
+          set -e
           if [ -z "$ADDR" ]; then
-            echo "Не удалось получить адрес туннеля, смотрите $RUNNER_TEMP/ngrok.log"
-            cat "$RUNNER_TEMP/ngrok.log" || true
+            echo "Не удалось получить адрес туннеля, смотрите лог ngrok ниже:"
+            cat "$RUNNER_TEMP/ngrok.log" 2>/dev/null || true
             exit 1
           fi
 
